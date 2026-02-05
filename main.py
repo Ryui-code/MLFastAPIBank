@@ -33,7 +33,7 @@ async def predict(bank: BankSchema):
     ]
 
     new_cb = bank_dict.pop('previous_loan_defaults_on_file')
-    cb1or_0 = [
+    prevf1or_0 = [
         1 if new_cb == 'Yes' else 0
     ]
 
@@ -61,7 +61,7 @@ async def predict(bank: BankSchema):
         1 if new_loani == 'VENTURE' else 0
     ]
 
-    features = list(bank_dict.values()) + gender1or_0 + cb1or_0 + edu1or_0 + pho1or_0 + loani1or_0
+    features = list(bank_dict.values()) + gender1or_0 + edu1or_0 + pho1or_0 + loani1or_0 + prevf1or_0
 
     scaled_data = scaler.transform([features])
     approved = model.predict(scaled_data)[0]
