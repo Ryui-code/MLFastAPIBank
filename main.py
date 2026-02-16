@@ -1,12 +1,16 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-import uvicorn
 import joblib
+import uvicorn
 
 app = FastAPI()
 
 model = joblib.load('model (2).pkl')
 scaler = joblib.load('scaler (2).pkl')
+
+education_list = ['Bachelor', 'Doctorate', 'High School', 'Master']
+home_ownership_list = ['OTHER', 'OWN', 'RENT']
+loan_intent_list = ['EDUCATION', 'HOMEIMPROVEMENT', 'MEDICAL', 'PERSONAL', 'VENTURE']
 
 class BankSchema(BaseModel):
     person_age: int
@@ -23,53 +27,49 @@ class BankSchema(BaseModel):
     loan_intent: str
     previous_loan_defaults_on_file: str
 
+def build_features(b: BankSchema):
+
+    numeric = [
+        b.person_age,
+        b.person_income,
+        b.person_emp_exp,
+        b.loan_amnt,
+        b.loan_int_rate,
+        b.loan_percent_income,
+        b.cb_person_cred_hist_length,
+        b.credit_score,
+    ]
+
+    gender = [1 if b.person_gender == 'male' else 0]
+
+    education = [1 if b.person_education == e else 0 for e in education_list]
+
+    home_ownership = [1 if b.person_home_ownership == h else 0 for h in home_ownership_list]
+
+    loan_intent = [1 if b.loan_intent == l else 0 for l in loan_intent_list]
+
+    prev_default = [1 if b.previous_loan_defaults_on_file == 'Yes' else 0]
+
+    return (
+        numeric
+        + gender
+        + education
+        + home_ownership
+        + loan_intent
+        + prev_default
+    )
+
 @app.post('/predict/')
 async def predict(bank: BankSchema):
-    bank_dict = bank.dict()
+    features = build_features(bank)
+    scaled = scaler.transform([features])
 
-    new_gender = bank_dict.pop('person_gender')
-    gender1or_0 = [
-        1 if new_gender == 'male' else 0
-    ]
-
-    new_cb = bank_dict.pop('previous_loan_defaults_on_file')
-    prevf1or_0 = [
-        1 if new_cb == 'Yes' else 0
-    ]
-
-    new_edu = bank_dict.pop('person_education')
-    edu1or_0 = [
-        1 if new_edu == 'Bachelor' else 0,
-        1 if new_edu == 'Doctorate' else 0,
-        1 if new_edu == 'High School' else 0,
-        1 if new_edu == 'Master' else 0,
-    ]
-
-    new_pho = bank_dict.pop('person_home_ownership')
-    pho1or_0 = [
-        1 if new_pho == 'OTHER' else 0,
-        1 if new_pho == 'OWN' else 0,
-        1 if new_pho == 'RENT' else 0
-    ]
-
-    new_loani = bank_dict.pop('loan_intent')
-    loani1or_0 = [
-        1 if new_loani == 'EDUCATION' else 0,
-        1 if new_loani == 'HOMEIMPROVEMENT' else 0,
-        1 if new_loani == 'MEDICAL' else 0,
-        1 if new_loani == 'PERSONAL' else 0,
-        1 if new_loani == 'VENTURE' else 0
-    ]
-
-    features = list(bank_dict.values()) + gender1or_0 + edu1or_0 + pho1or_0 + loani1or_0 + prevf1or_0
-
-    scaled_data = scaler.transform([features])
-    approved = model.predict(scaled_data)[0]
-    probability = model.predict_proba(scaled_data)[0][1]
+    pred = model.predict(scaled)[0]
+    prob = model.predict_proba(scaled)[0][1]
 
     return {
-        "approved": bool(approved),
-        "probability": float(probability)
+        'approved': bool(pred),
+        'probability': float(prob)
     }
 
 if __name__ == '__main__':
