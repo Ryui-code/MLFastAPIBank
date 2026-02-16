@@ -68,7 +68,7 @@ async def predict(bank: BankSchema):
     prob = model.predict_proba(scaled)[0][1]
 
     return {
-        'approved': bool(pred),
+        'loan_status': int(pred),
         'probability': float(prob)
     }
 
